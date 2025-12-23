@@ -43,6 +43,11 @@ var SampleProcesses = []string{
 	"systemd", "cron", "bash", "python3", "node",
 }
 
+// SamplePorts contains common destination ports for flow data
+var SamplePorts = []uint16{
+	22, 23, 25, 53, 80, 443, 445, 993, 995, 3306, 3389, 5432, 6379, 8080, 8443, 9200,
+}
+
 // GenerateJSONEvent generates a random JSON event for testing
 func GenerateJSONEvent() ([]byte, error) {
 	event := map[string]interface{}{

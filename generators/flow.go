@@ -25,8 +25,9 @@ func GenerateSFlowPacket() []byte {
 	buf = binary.BigEndian.AppendUint32(buf, 1)           // Sample count
 
 	// Flow sample header
-	buf = binary.BigEndian.AppendUint32(buf, 1)           // Sample type: flow sample
-	buf = binary.BigEndian.AppendUint32(buf, 88)          // Sample length
+	// Sample length = 32 bytes (flow sample fields) + 8 bytes (record header) + 60 bytes (record content) = 100
+	buf = binary.BigEndian.AppendUint32(buf, 1)   // Sample type: flow sample
+	buf = binary.BigEndian.AppendUint32(buf, 100) // Sample length
 
 	// Flow sample data
 	buf = binary.BigEndian.AppendUint32(buf, rand.Uint32()) // Sequence number
@@ -39,34 +40,47 @@ func GenerateSFlowPacket() []byte {
 	buf = binary.BigEndian.AppendUint32(buf, 1)             // Flow record count
 
 	// Flow record: Raw packet header
-	buf = binary.BigEndian.AppendUint32(buf, 1)    // Record type: raw packet header
-	buf = binary.BigEndian.AppendUint32(buf, 48)   // Record length
+	// Record length = 16 bytes (SampledHeader fields) + 42 bytes (header data) = 58
+	// SampledHeader fields: Protocol(4) + FrameLength(4) + Stripped(4) + HeaderLength(4) = 16
+	// Header data: Ethernet(14) + IP(20) + TCP ports(8) = 42
+	buf = binary.BigEndian.AppendUint32(buf, 1)  // Record type: raw packet header (FLOW_TYPE_RAW)
+	buf = binary.BigEndian.AppendUint32(buf, 60) // Record length (padded to 4-byte boundary)
 
-	// Raw packet header format
+	// Raw packet header format (SampledHeader fields)
 	buf = binary.BigEndian.AppendUint32(buf, 1)    // Header protocol (1 = Ethernet)
 	buf = binary.BigEndian.AppendUint32(buf, 1500) // Frame length
 	buf = binary.BigEndian.AppendUint32(buf, 0)    // Stripped bytes
-	buf = binary.BigEndian.AppendUint32(buf, 34)   // Header length
+	buf = binary.BigEndian.AppendUint32(buf, 42)   // Header data length (Eth + IP + TCP ports)
 
-	// Minimal Ethernet + IP header (34 bytes)
+	// Ethernet + IP + TCP header (42 bytes total)
 	// Ethernet header (14 bytes)
 	buf = append(buf, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55) // Dst MAC
 	buf = append(buf, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb) // Src MAC
 	buf = append(buf, 0x08, 0x00)                          // EtherType: IPv4
 
 	// IP header (20 bytes)
-	buf = append(buf, 0x45, 0x00)                          // Version/IHL, DSCP
-	buf = binary.BigEndian.AppendUint16(buf, 1480)         // Total length
+	buf = append(buf, 0x45, 0x00)                                         // Version/IHL, DSCP
+	buf = binary.BigEndian.AppendUint16(buf, 1480)                        // Total length
 	buf = binary.BigEndian.AppendUint16(buf, uint16(rand.Uint32()&0xFFFF)) // ID
-	buf = append(buf, 0x00, 0x00)                          // Flags/Fragment
-	buf = append(buf, 64, 6)                               // TTL, Protocol (TCP)
-	buf = append(buf, 0x00, 0x00)                          // Checksum (0 for fake)
+	buf = append(buf, 0x00, 0x00)                                         // Flags/Fragment
+	buf = append(buf, 64, 6)                                              // TTL, Protocol (TCP)
+	buf = append(buf, 0x00, 0x00)                                         // Checksum (0 for fake)
 
 	// Random source/dest IPs
 	srcIP := net.ParseIP(SampleIPs[rand.Intn(len(SampleIPs))]).To4()
 	dstIP := net.ParseIP(SampleIPs[rand.Intn(len(SampleIPs))]).To4()
 	buf = append(buf, srcIP...)
 	buf = append(buf, dstIP...)
+
+	// TCP/UDP ports (8 bytes for extraction)
+	srcPort := uint16(rand.Intn(65535-1024) + 1024) // Random high port
+	dstPort := SamplePorts[rand.Intn(len(SamplePorts))]
+	buf = binary.BigEndian.AppendUint16(buf, srcPort) // Source port
+	buf = binary.BigEndian.AppendUint16(buf, dstPort) // Destination port
+	buf = append(buf, 0x00, 0x00, 0x00, 0x00)         // TCP sequence number (4 bytes padding to 42)
+
+	// Padding to reach record length of 60 (need 2 more bytes)
+	buf = append(buf, 0x00, 0x00)
 
 	return buf
 }
