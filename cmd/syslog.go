@@ -20,17 +20,25 @@ var syslogPort int
 var syslogRate int
 var syslogCount int
 var syslogRFC string
+var syslogType string
 
 var syslogCmd = &cobra.Command{
 	Use:   "syslog",
 	Short: "Send fake syslog messages over UDP",
 	Long: `Send fake syslog messages over UDP to test syslog ingestion.
 
-Supports both RFC3164 and RFC5424 formats.
+Supports both RFC3164 and RFC5424 formats, with multiple message types:
+  generic   - Standard auth/system messages (default)
+  tms       - DDoS mitigation system logs (blocked_host events)
+  firewall  - UFW/iptables style firewall logs
+  ids       - Snort/Suricata IDS alert format
 
 Example:
   fakedata syslog --host 127.0.0.1 --port 514 --rfc 3164
   fakedata syslog --host 127.0.0.1 --port 514 --rfc 5424
+  fakedata syslog --host 127.0.0.1 --port 514 --type tms --rate 100
+  fakedata syslog --host 127.0.0.1 --port 514 --type firewall
+  fakedata syslog --host 127.0.0.1 --port 514 --type ids
 `,
 	RunE: runSyslog,
 }
@@ -41,11 +49,18 @@ func init() {
 	syslogCmd.Flags().IntVar(&syslogRate, "rate", 10, "Messages per second")
 	syslogCmd.Flags().IntVar(&syslogCount, "count", 0, "Total messages to send (0 = unlimited)")
 	syslogCmd.Flags().StringVar(&syslogRFC, "rfc", "3164", "Syslog RFC format (3164 or 5424)")
+	syslogCmd.Flags().StringVar(&syslogType, "type", "generic", "Message type: generic, tms, firewall, ids")
 }
 
 func runSyslog(cmd *cobra.Command, args []string) error {
 	if syslogRFC != "3164" && syslogRFC != "5424" {
 		return fmt.Errorf("invalid RFC format: %s (must be 3164 or 5424)", syslogRFC)
+	}
+
+	// Validate message type
+	validTypes := map[string]bool{"generic": true, "tms": true, "firewall": true, "ids": true}
+	if !validTypes[syslogType] {
+		return fmt.Errorf("invalid message type: %s (must be generic, tms, firewall, or ids)", syslogType)
 	}
 
 	addr := fmt.Sprintf("%s:%d", syslogHost, syslogPort)
@@ -55,7 +70,7 @@ func runSyslog(cmd *cobra.Command, args []string) error {
 	}
 	defer conn.Close()
 
-	fmt.Printf("Sending fake syslog (RFC%s) to UDP %s at %d msg/s\n", syslogRFC, addr, syslogRate)
+	fmt.Printf("Sending fake syslog (type=%s, RFC%s) to UDP %s at %d msg/s\n", syslogType, syslogRFC, addr, syslogRate)
 	if syslogCount > 0 {
 		fmt.Printf("Will send %d messages total\n", syslogCount)
 	} else {
@@ -79,7 +94,18 @@ func runSyslog(cmd *cobra.Command, args []string) error {
 			fmt.Printf("\nStopped. Sent %d messages in %v\n", sent, time.Since(startTime))
 			return nil
 		case <-ticker.C:
-			msg := generators.GenerateSyslogMessage(syslogRFC)
+			var msg string
+			switch syslogType {
+			case "tms":
+				msg = generators.GenerateTMSSyslog()
+			case "firewall":
+				msg = generators.GenerateFirewallSyslog()
+			case "ids":
+				msg = generators.GenerateIDSSyslog()
+			default:
+				msg = generators.GenerateSyslogMessage(syslogRFC)
+			}
+
 			if _, err := conn.Write([]byte(msg)); err != nil {
 				fmt.Fprintf(os.Stderr, "Error sending: %v\n", err)
 				continue

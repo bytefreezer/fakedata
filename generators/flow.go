@@ -85,44 +85,94 @@ func GenerateSFlowPacket() []byte {
 	return buf
 }
 
-// GenerateIPFIXPacket generates a minimal valid IPFIX packet
+// GenerateIPFIXPacket generates a valid IPFIX packet with common flow fields
 // Structure based on RFC 7011
+// Fields: protocolIdentifier, sourceTransportPort, sourceIPv4Address, destinationTransportPort,
+//         destinationIPv4Address, octetDeltaCount, packetDeltaCount
 func GenerateIPFIXPacket() []byte {
-	buf := make([]byte, 0, 128)
+	buf := make([]byte, 0, 256)
+
+	// Calculate sizes:
+	// Template: 4 (header) + 4 (template header) + 7*4 (7 field specs) = 36 bytes
+	// Data: 4 (header) + 1 (proto) + 2 (srcPort) + 4 (srcIP) + 2 (dstPort) + 4 (dstIP) + 8 (bytes) + 8 (packets) = 33 bytes
+	// Total: 16 (header) + 36 (template set) + 33 (data set) = 85 bytes
 
 	// IPFIX Message Header (16 bytes)
-	buf = binary.BigEndian.AppendUint16(buf, 10)           // Version 10 (IPFIX)
-	buf = binary.BigEndian.AppendUint16(buf, 52)           // Length
+	buf = binary.BigEndian.AppendUint16(buf, 10)                        // Version 10 (IPFIX)
+	buf = binary.BigEndian.AppendUint16(buf, 85)                        // Length
 	buf = binary.BigEndian.AppendUint32(buf, uint32(time.Now().Unix())) // Export time
-	buf = binary.BigEndian.AppendUint32(buf, rand.Uint32()) // Sequence number
-	buf = binary.BigEndian.AppendUint32(buf, 12345)         // Observation domain ID
+	buf = binary.BigEndian.AppendUint32(buf, rand.Uint32())             // Sequence number
+	buf = binary.BigEndian.AppendUint32(buf, 12345)                     // Observation domain ID
 
-	// Template Set Header (4 bytes)
-	buf = binary.BigEndian.AppendUint16(buf, 2)    // Set ID = 2 (Template Set)
-	buf = binary.BigEndian.AppendUint16(buf, 20)   // Set length
+	// Template Set Header (4 bytes) + Template Record (32 bytes) = 36 bytes
+	buf = binary.BigEndian.AppendUint16(buf, 2)  // Set ID = 2 (Template Set)
+	buf = binary.BigEndian.AppendUint16(buf, 36) // Set length
 
-	// Template Record
-	buf = binary.BigEndian.AppendUint16(buf, 256)  // Template ID
-	buf = binary.BigEndian.AppendUint16(buf, 2)    // Field count
+	// Template Record Header
+	buf = binary.BigEndian.AppendUint16(buf, 256) // Template ID
+	buf = binary.BigEndian.AppendUint16(buf, 7)   // Field count
 
-	// Field specifiers
-	// sourceIPv4Address (IE 8)
-	buf = binary.BigEndian.AppendUint16(buf, 8)    // IE ID
-	buf = binary.BigEndian.AppendUint16(buf, 4)    // Length
+	// Field specifiers (4 bytes each: 2 for IE ID, 2 for length)
+	// protocolIdentifier (IE 4) - 1 byte
+	buf = binary.BigEndian.AppendUint16(buf, 4)
+	buf = binary.BigEndian.AppendUint16(buf, 1)
 
-	// destinationIPv4Address (IE 12)
-	buf = binary.BigEndian.AppendUint16(buf, 12)   // IE ID
-	buf = binary.BigEndian.AppendUint16(buf, 4)    // Length
+	// sourceTransportPort (IE 7) - 2 bytes
+	buf = binary.BigEndian.AppendUint16(buf, 7)
+	buf = binary.BigEndian.AppendUint16(buf, 2)
 
-	// Data Set Header (4 bytes)
-	buf = binary.BigEndian.AppendUint16(buf, 256)  // Set ID = Template ID
-	buf = binary.BigEndian.AppendUint16(buf, 12)   // Set length
+	// sourceIPv4Address (IE 8) - 4 bytes
+	buf = binary.BigEndian.AppendUint16(buf, 8)
+	buf = binary.BigEndian.AppendUint16(buf, 4)
 
-	// Data Record (8 bytes - 2 IPv4 addresses)
+	// destinationTransportPort (IE 11) - 2 bytes
+	buf = binary.BigEndian.AppendUint16(buf, 11)
+	buf = binary.BigEndian.AppendUint16(buf, 2)
+
+	// destinationIPv4Address (IE 12) - 4 bytes
+	buf = binary.BigEndian.AppendUint16(buf, 12)
+	buf = binary.BigEndian.AppendUint16(buf, 4)
+
+	// octetDeltaCount (IE 1) - 8 bytes
+	buf = binary.BigEndian.AppendUint16(buf, 1)
+	buf = binary.BigEndian.AppendUint16(buf, 8)
+
+	// packetDeltaCount (IE 2) - 8 bytes
+	buf = binary.BigEndian.AppendUint16(buf, 2)
+	buf = binary.BigEndian.AppendUint16(buf, 8)
+
+	// Data Set Header (4 bytes) + Data Record (29 bytes) = 33 bytes
+	buf = binary.BigEndian.AppendUint16(buf, 256) // Set ID = Template ID
+	buf = binary.BigEndian.AppendUint16(buf, 33)  // Set length
+
+	// Data Record
+	// protocolIdentifier (1 byte) - 6=TCP, 17=UDP
+	protocols := []byte{6, 17}
+	buf = append(buf, protocols[rand.Intn(len(protocols))])
+
+	// sourceTransportPort (2 bytes)
+	srcPort := uint16(rand.Intn(65535-1024) + 1024)
+	buf = binary.BigEndian.AppendUint16(buf, srcPort)
+
+	// sourceIPv4Address (4 bytes)
 	srcIP := net.ParseIP(SampleIPs[rand.Intn(len(SampleIPs))]).To4()
-	dstIP := net.ParseIP(SampleIPs[rand.Intn(len(SampleIPs))]).To4()
 	buf = append(buf, srcIP...)
+
+	// destinationTransportPort (2 bytes)
+	dstPort := SamplePorts[rand.Intn(len(SamplePorts))]
+	buf = binary.BigEndian.AppendUint16(buf, dstPort)
+
+	// destinationIPv4Address (4 bytes)
+	dstIP := net.ParseIP(SampleIPs[rand.Intn(len(SampleIPs))]).To4()
 	buf = append(buf, dstIP...)
+
+	// octetDeltaCount (8 bytes) - random bytes between 64 and 65535
+	bytes := uint64(rand.Intn(65535-64) + 64)
+	buf = binary.BigEndian.AppendUint64(buf, bytes)
+
+	// packetDeltaCount (8 bytes) - random packets between 1 and 1000
+	packets := uint64(rand.Intn(1000) + 1)
+	buf = binary.BigEndian.AppendUint64(buf, packets)
 
 	return buf
 }
