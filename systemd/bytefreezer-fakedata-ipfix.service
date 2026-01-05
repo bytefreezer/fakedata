@@ -1,0 +1,14 @@
+[Unit]
+Description=ByteFreezer Fakedata IPFIX Generator
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/bytefreezer-fakedata ipfix --host 127.0.0.1 --port 4739
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

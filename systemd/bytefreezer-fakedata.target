@@ -1,0 +1,10 @@
+[Unit]
+Description=ByteFreezer Fakedata Generators
+After=network.target
+Wants=bytefreezer-fakedata-ipfix.service
+Wants=bytefreezer-fakedata-sflow.service
+Wants=bytefreezer-fakedata-syslog-firewall.service
+Wants=bytefreezer-fakedata-syslog-rfc3164.service
+
+[Install]
+WantedBy=multi-user.target

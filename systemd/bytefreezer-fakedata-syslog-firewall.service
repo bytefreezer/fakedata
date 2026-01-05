@@ -1,0 +1,14 @@
+[Unit]
+Description=ByteFreezer Fakedata Syslog Firewall Generator
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/bytefreezer-fakedata syslog --host 127.0.0.1 --port 515 --type firewall
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

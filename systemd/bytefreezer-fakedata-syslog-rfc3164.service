@@ -1,0 +1,14 @@
+[Unit]
+Description=ByteFreezer Fakedata Syslog RFC3164 Generator
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/bytefreezer-fakedata syslog --host 127.0.0.1 --port 514 --rfc 3164
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

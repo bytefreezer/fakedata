@@ -1,0 +1,14 @@
+[Unit]
+Description=ByteFreezer Fakedata sFlow Generator
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/bytefreezer-fakedata sflow --host 127.0.0.1 --port 6343
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
