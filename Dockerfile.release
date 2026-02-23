@@ -1,6 +1,9 @@
-FROM scratch
+FROM alpine:3.19
+
+RUN apk add --no-cache ca-certificates && rm -rf /var/cache/apk/*
 
 COPY bytefreezer-fakedata /bytefreezer-fakedata
+RUN chmod +x /bytefreezer-fakedata
 
 ENTRYPOINT ["/bytefreezer-fakedata"]
 
