@@ -1,0 +1,17 @@
+FROM scratch
+
+COPY bytefreezer-fakedata /bytefreezer-fakedata
+
+ENTRYPOINT ["/bytefreezer-fakedata"]
+
+ARG VERSION=unknown
+ARG BUILD_TIME=unknown
+ARG GIT_COMMIT=unknown
+LABEL maintainer="ByteFreezer Team" \
+      org.opencontainers.image.title="ByteFreezer Fakedata" \
+      org.opencontainers.image.description="Synthetic data generator for testing ByteFreezer pipelines" \
+      org.opencontainers.image.vendor="ByteFreezer" \
+      org.opencontainers.image.source="https://github.com/bytefreezer/fakedata" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.created="${BUILD_TIME}" \
+      org.opencontainers.image.revision="${GIT_COMMIT}"
